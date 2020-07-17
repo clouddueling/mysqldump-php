@@ -75,12 +75,12 @@ class Mysqldump
     private $procedures = array();
     private $functions = array();
     private $events = array();
-    private $dbHandler = null;
+    protected $dbHandler = null;
     private $dbType = "";
     private $compressManager;
     private $typeAdapter;
-    private $dumpSettings = array();
-    private $pdoSettings = array();
+    protected $dumpSettings = array();
+    protected $pdoSettings = array();
     private $version;
     private $tableColumnTypes = array();
     private $transformTableRowCallable;
@@ -114,6 +114,47 @@ class Mysqldump
     private $tableWheres = array();
     private $tableLimits = array();
 
+    protected $dump_settings_defaults = array(
+	    'include-tables' => array(),
+	    'exclude-tables' => array(),
+	    'include-views' => array(),
+	    'compress' => Mysqldump::NONE,
+	    'init_commands' => array(),
+	    'no-data' => array(),
+	    'reset-auto-increment' => false,
+	    'add-drop-database' => false,
+	    'add-drop-table' => false,
+	    'add-drop-trigger' => true,
+	    'add-locks' => true,
+	    'complete-insert' => false,
+	    'databases' => false,
+	    'default-character-set' => Mysqldump::UTF8,
+	    'disable-keys' => true,
+	    'extended-insert' => true,
+	    'events' => false,
+	    'hex-blob' => true, /* faster than escaped content */
+	    'insert-ignore' => false,
+	    'net_buffer_length' => self::MAXLINESIZE,
+	    'no-autocommit' => true,
+	    'no-create-info' => false,
+	    'lock-tables' => true,
+	    'routines' => false,
+	    'single-transaction' => true,
+	    'skip-triggers' => false,
+	    'skip-tz-utc' => false,
+	    'skip-comments' => false,
+	    'skip-dump-date' => false,
+	    'skip-definer' => false,
+	    'where' => '',
+	    /* deprecated */
+	    'disable-foreign-keys-check' => true
+    );
+
+	protected $pdo_settings_defaults = array(
+		PDO::ATTR_PERSISTENT => true,
+		PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+	);
+
 
     /**
      * Constructor of Mysqldump. Note that in the case of an SQLite database
@@ -132,65 +173,24 @@ class Mysqldump
         $dumpSettings = array(),
         $pdoSettings = array()
     ) {
-        $dumpSettingsDefault = array(
-            'include-tables' => array(),
-            'exclude-tables' => array(),
-            'include-views' => array(),
-            'compress' => Mysqldump::NONE,
-            'init_commands' => array(),
-            'no-data' => array(),
-            'reset-auto-increment' => false,
-            'add-drop-database' => false,
-            'add-drop-table' => false,
-            'add-drop-trigger' => true,
-            'add-locks' => true,
-            'complete-insert' => false,
-            'databases' => false,
-            'default-character-set' => Mysqldump::UTF8,
-            'disable-keys' => true,
-            'extended-insert' => true,
-            'events' => false,
-            'hex-blob' => true, /* faster than escaped content */
-            'insert-ignore' => false,
-            'net_buffer_length' => self::MAXLINESIZE,
-            'no-autocommit' => true,
-            'no-create-info' => false,
-            'lock-tables' => true,
-            'routines' => false,
-            'single-transaction' => true,
-            'skip-triggers' => false,
-            'skip-tz-utc' => false,
-            'skip-comments' => false,
-            'skip-dump-date' => false,
-            'skip-definer' => false,
-            'where' => '',
-            /* deprecated */
-            'disable-foreign-keys-check' => true
-        );
-
-        $pdoSettingsDefault = array(
-            PDO::ATTR_PERSISTENT => true,
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        );
-
         $this->user = $user;
         $this->pass = $pass;
         $this->parseDsn($dsn);
 
         // This drops MYSQL dependency, only use the constant if it's defined.
         if ("mysql" === $this->dbType) {
-            $pdoSettingsDefault[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = false;
+            $this->pdo_settings_defaults[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = false;
         }
 
-        $this->pdoSettings = self::array_replace_recursive($pdoSettingsDefault, $pdoSettings);
-        $this->dumpSettings = self::array_replace_recursive($dumpSettingsDefault, $dumpSettings);
+        $this->pdoSettings = self::array_replace_recursive($this->pdo_settings_defaults, $pdoSettings);
+        $this->dumpSettings = self::array_replace_recursive($this->dump_settings_defaults, $dumpSettings);
         $this->dumpSettings['init_commands'][] = "SET NAMES ".$this->dumpSettings['default-character-set'];
 
         if (false === $this->dumpSettings['skip-tz-utc']) {
             $this->dumpSettings['init_commands'][] = "SET TIME_ZONE='+00:00'";
         }
 
-        $diff = array_diff(array_keys($this->dumpSettings), array_keys($dumpSettingsDefault));
+        $diff = array_diff(array_keys($this->dumpSettings), array_keys($this->dump_settings_defaults));
         if (count($diff) > 0) {
             throw new Exception("Unexpected value in dumpSettings: (".implode(",", $diff).")");
         }
@@ -350,7 +350,7 @@ class Mysqldump
      *
      * @return null
      */
-    private function connect()
+    protected function connect()
     {
         // Connecting with PDO.
         try {
