@@ -44,7 +44,7 @@ class Mysqldump
     const UTF8    = 'utf8';
     const UTF8MB4 = 'utf8mb4';
     const BINARY = 'binary';
-    
+
     /**
      * Database username.
      * @var string
@@ -156,6 +156,7 @@ class Mysqldump
             'insert-ignore' => false,
             'net_buffer_length' => self::MAXLINESIZE,
             'no-autocommit' => true,
+            'no-create-db' => false,
             'no-create-info' => false,
             'lock-tables' => true,
             'routines' => false,
@@ -1812,6 +1813,11 @@ class TypeAdapterMysql extends TypeAdapterFactory
 
     public function databases()
     {
+
+        if ($this->dumpSettings['no-create-db']) {
+            return "";
+        }
+
         $this->check_parameters(func_num_args(), $expected_num_args = 1, __METHOD__);
         $args = func_get_args();
         $databaseName = $args[0];
@@ -1875,10 +1881,10 @@ class TypeAdapterMysql extends TypeAdapterFactory
             $replace = "";
             $createTable = preg_replace($match, $replace, $createTable);
         }
-        
+
 		if ($this->dumpSettings['if-not-exists'] ) {
 			$createTable = preg_replace('/^CREATE TABLE/', 'CREATE TABLE IF NOT EXISTS', $createTable);
-        }        
+        }
 
         $ret = "/*!40101 SET @saved_cs_client     = @@character_set_client */;".PHP_EOL.
             "/*!40101 SET character_set_client = ".$this->dumpSettings['default-character-set']." */;".PHP_EOL.
